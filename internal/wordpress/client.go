@@ -237,6 +237,17 @@ func (c *Client) UpdatePost(ctx context.Context, id int, title, content, excerpt
 	return post, err
 }
 
+// SetPostStatus changes only a post's publication status. It does not change its
+// slug, date, content, taxonomy, or comment configuration.
+func (c *Client) SetPostStatus(ctx context.Context, id int, status string) (Post, error) {
+	if status != "publish" && status != "draft" {
+		return Post{}, errors.New("post status must be publish or draft")
+	}
+	var post Post
+	err := c.doJSON(ctx, http.MethodPost, fmt.Sprintf("posts/%d", id), nil, map[string]string{"status": status}, &post)
+	return post, err
+}
+
 // DeletePost moves a post to trash unless permanent is true.
 func (c *Client) DeletePost(ctx context.Context, id int, permanent bool) error {
 	return c.doJSON(ctx, http.MethodDelete, fmt.Sprintf("posts/%d", id), url.Values{"force": {fmt.Sprint(permanent)}}, nil, nil)

@@ -74,6 +74,23 @@ type deleteInput struct {
 	Permanent bool `json:"permanent,omitempty" jsonschema:"true deletes permanently; false moves to trash."`
 }
 
+type bulkPostStatusInput struct {
+	IDs     []int `json:"ids" jsonschema:"One to 100 unique numeric WordPress post IDs."`
+	Confirm bool  `json:"confirm" jsonschema:"Must be true to confirm this status change."`
+}
+
+type postStatusResult struct {
+	ID    int             `json:"id"`
+	Post  *wordpress.Post `json:"post,omitempty"`
+	Error string          `json:"error,omitempty"`
+}
+
+type bulkPostStatusOutput struct {
+	TargetStatus string             `json:"target_status"`
+	Complete     bool               `json:"complete"`
+	Results      []postStatusResult `json:"results"`
+}
+
 type deleteOutput struct {
 	ID        int  `json:"id"`
 	Deleted   bool `json:"deleted"`
@@ -110,6 +127,15 @@ func addPostTools(server *mcp.Server, wp *wordpress.Client) {
 			post, err := wp.UpdatePost(ctx, input.ID, input.Title, input.Content, input.Excerpt, input.Categories, input.Tags)
 			return nil, postOutput{Post: post}, err
 		})
+	mcp.AddTool(server, &mcp.Tool{Name: "wordpress_publish_posts", Description: "Publishes one or more posts. Requires confirm=true and reports each result; the operation is not transactional."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, input bulkPostStatusInput) (*mcp.CallToolResult, bulkPostStatusOutput, error) {
+			return changePostStatus(ctx, wp, input, "publish")
+		})
+	mcp.AddTool(server, &mcp.Tool{Name: "wordpress_unpublish_posts", Description: "Moves one or more published posts back to draft. Requires confirm=true and reports each result; the operation is not transactional."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, input bulkPostStatusInput) (*mcp.CallToolResult, bulkPostStatusOutput, error) {
+			return changePostStatus(ctx, wp, input, "draft")
+		})
+
 	mcp.AddTool(server, &mcp.Tool{Name: "wordpress_delete_post", Description: "Moves a post to trash or deletes it permanently. Requires confirm=true."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, input deleteInput) (*mcp.CallToolResult, deleteOutput, error) {
 			if err := validID(input.ID, "post"); err != nil {
@@ -276,6 +302,48 @@ func addSiteTools(server *mcp.Server, wp *wordpress.Client, baseURL string) {
 			post, httpStatus, live, err := wp.CheckPostLive(ctx, input.ID)
 			return nil, liveOutput{Post: post, HTTPStatus: httpStatus, Live: live}, err
 		})
+}
+
+func changePostStatus(ctx context.Context, wp *wordpress.Client, input bulkPostStatusInput, status string) (*mcp.CallToolResult, bulkPostStatusOutput, error) {
+	if !input.Confirm {
+		return nil, bulkPostStatusOutput{}, errors.New("status change requires confirm=true")
+	}
+	if err := validateBulkPostIDs(input.IDs); err != nil {
+		return nil, bulkPostStatusOutput{}, err
+	}
+
+	output := bulkPostStatusOutput{
+		TargetStatus: status,
+		Complete:     true,
+		Results:      make([]postStatusResult, 0, len(input.IDs)),
+	}
+	for _, id := range input.IDs {
+		post, err := wp.SetPostStatus(ctx, id, status)
+		if err != nil {
+			output.Complete = false
+			output.Results = append(output.Results, postStatusResult{ID: id, Error: err.Error()})
+			continue
+		}
+		output.Results = append(output.Results, postStatusResult{ID: id, Post: &post})
+	}
+	return nil, output, nil
+}
+
+func validateBulkPostIDs(ids []int) error {
+	if len(ids) == 0 || len(ids) > 100 {
+		return errors.New("ids must contain between one and 100 post IDs")
+	}
+	seen := make(map[int]struct{}, len(ids))
+	for _, id := range ids {
+		if err := validID(id, "post"); err != nil {
+			return err
+		}
+		if _, duplicate := seen[id]; duplicate {
+			return fmt.Errorf("post ID %d is duplicated", id)
+		}
+		seen[id] = struct{}{}
+	}
+	return nil
 }
 
 func validID(id int, resource string) error {

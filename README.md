@@ -12,7 +12,7 @@ protocol and diagnostic messages go to `stderr`.
 
 | Area | Tools |
 |---|---|
-| Posts | `wordpress_list_posts`, `wordpress_get_post`, `wordpress_create_post`, `wordpress_update_post`, `wordpress_delete_post` |
+| Posts | `wordpress_list_posts`, `wordpress_get_post`, `wordpress_create_post`, `wordpress_update_post`, `wordpress_publish_posts`, `wordpress_unpublish_posts`, `wordpress_delete_post` |
 | Media | `wordpress_list_media`, `wordpress_get_media`, `wordpress_upload_media`, `wordpress_update_media`, `wordpress_delete_media` |
 | Covers | `wordpress_set_post_cover` |
 | Taxonomy and validation | `wordpress_list_categories`, `wordpress_list_tags`, `wordpress_site_health`, `wordpress_check_post_live` |
@@ -28,7 +28,9 @@ protocol and diagnostic messages go to `stderr`.
   local paths the MCP process can read.
 - `wordpress_create_post` always closes comments.
 - `wordpress_update_post` cannot change an existing post's slug, date, or
-  status, and keeps comments closed.
+  status, and keeps comments closed. Dedicated publish and unpublish tools
+  require `confirm: true`, accept one to 100 unique IDs, and report every
+  result because bulk status changes are not transactional.
 - `wordpress_set_post_cover` uploads the image, uses the relative URL returned
   by the site, and places it as the first body element. It **does not** set a
   featured image, avoiding duplicated covers in themes that render featured images separately.
@@ -134,10 +136,22 @@ Replace the first body cover image (replacement is the default):
 }
 ```
 
+Publish one or more posts (explicit confirmation is required):
+
+```json
+{ "ids": [123, 124], "confirm": true }
+```
+
+Unpublish one or more posts by moving them to drafts:
+
+```json
+{ "ids": [123, 124], "confirm": true }
+```
+
 Check the public post:
 
 ```json
-{ "id": 1533 }
+{ "id": 123 }
 ```
 
 ## Development

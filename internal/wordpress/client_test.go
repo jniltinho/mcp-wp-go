@@ -162,3 +162,28 @@ func TestGetPostExposesFeaturedMedia(t *testing.T) {
 		t.Fatalf("FeaturedMedia = %d, want 99", post.FeaturedMedia)
 	}
 }
+
+func TestSetPostStatusOnlySendsStatus(t *testing.T) {
+	client, site := testClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/wp-json/wp/v2/posts/12" {
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL)
+		}
+		var payload map[string]string
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatal(err)
+		}
+		if len(payload) != 1 || payload["status"] != "draft" {
+			t.Fatalf("payload = %#v", payload)
+		}
+		_, _ = w.Write([]byte(`{"id":12,"status":"draft","slug":"unchanged"}`))
+	}))
+	defer site.Close()
+
+	post, err := client.SetPostStatus(context.Background(), 12, "draft")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if post.ID != 12 || post.Status != "draft" {
+		t.Fatalf("post = %#v", post)
+	}
+}

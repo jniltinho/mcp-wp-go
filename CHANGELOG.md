@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 —
 
+## [0.2.0] — 2026-09-11
+
+### Added
+- Publish and unpublish one or up to 100 WordPress posts in a confirmed bulk operation.
+- Per-post status results that make partial failures visible to MCP clients.
+
+### Safety
+- Require explicit confirmation and preserve post content, slug, date, taxonomy, and comments during status-only changes.
+
 ## [0.1.4] — 2026-09-11
 
 **Release process aligned with the repository release standard.**
