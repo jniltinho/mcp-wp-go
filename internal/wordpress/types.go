@@ -37,6 +37,7 @@ type Media struct {
 	Date         string        `json:"date"`
 	Slug         string        `json:"slug"`
 	Link         string        `json:"link"`
+	Title        RenderedField `json:"title"`
 	SourceURL    string        `json:"source_url"`
 	AltText      string        `json:"alt_text"`
 	Caption      RenderedField `json:"caption"`

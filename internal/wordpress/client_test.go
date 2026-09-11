@@ -187,3 +187,73 @@ func TestSetPostStatusOnlySendsStatus(t *testing.T) {
 		t.Fatalf("post = %#v", post)
 	}
 }
+
+func TestContentTotalsUsesPaginationHeaders(t *testing.T) {
+	var calls []string
+	client, site := testClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.URL.Query().Get("context"); got != "edit" {
+			t.Fatalf("context = %q, want edit", got)
+		}
+		if got := r.URL.Query().Get("per_page"); got != "1" {
+			t.Fatalf("per_page = %q, want 1", got)
+		}
+		key := r.URL.Path + "?status=" + r.URL.Query().Get("status")
+		calls = append(calls, key)
+		switch key {
+		case "/wp-json/wp/v2/posts?status=any":
+			w.Header().Set("X-WP-Total", "11")
+		case "/wp-json/wp/v2/posts?status=publish":
+			w.Header().Set("X-WP-Total", "7")
+		case "/wp-json/wp/v2/media?status=":
+			w.Header().Set("X-WP-Total", "23")
+		default:
+			t.Fatalf("unexpected request %s", key)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`[]`))
+	}))
+	defer site.Close()
+
+	totals, err := client.ContentTotals(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if totals != (ContentTotals{Posts: 11, PublishedPosts: 7, Media: 23}) {
+		t.Fatalf("ContentTotals() = %#v", totals)
+	}
+	if len(calls) != 3 {
+		t.Fatalf("collection calls = %d, want 3", len(calls))
+	}
+}
+
+func TestContentTotalsRejectsInvalidHeader(t *testing.T) {
+	client, site := testClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-WP-Total", "not-a-number")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`[]`))
+	}))
+	defer site.Close()
+
+	if _, err := client.ContentTotals(context.Background()); err == nil {
+		t.Fatal("ContentTotals() returned nil error for invalid X-WP-Total")
+	}
+}
+
+func TestListMediaExposesTitle(t *testing.T) {
+	client, site := testClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/wp-json/wp/v2/media" || r.URL.Query().Get("context") != "edit" {
+			t.Fatalf("unexpected request %s", r.URL)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`[{"id":44,"title":{"rendered":"Server rack cover"},"source_url":"/wp-content/uploads/rack.webp"}]`))
+	}))
+	defer site.Close()
+
+	media, err := client.ListMedia(context.Background(), "", "image", 1, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(media) != 1 || media[0].Title.Rendered != "Server rack cover" {
+		t.Fatalf("ListMedia() = %#v", media)
+	}
+}

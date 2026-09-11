@@ -15,7 +15,7 @@ protocol and diagnostic messages go to `stderr`.
 | Posts | `wordpress_list_posts`, `wordpress_get_post`, `wordpress_create_post`, `wordpress_update_post`, `wordpress_publish_posts`, `wordpress_unpublish_posts`, `wordpress_delete_post` |
 | Media | `wordpress_list_media`, `wordpress_get_media`, `wordpress_upload_media`, `wordpress_update_media`, `wordpress_delete_media` |
 | Covers | `wordpress_set_post_cover` |
-| Taxonomy and validation | `wordpress_list_categories`, `wordpress_list_tags`, `wordpress_site_health`, `wordpress_check_post_live` |
+| Taxonomy and validation | `wordpress_list_categories`, `wordpress_list_tags`, `wordpress_content_stats`, `wordpress_site_health`, `wordpress_check_post_live` |
 
 ### Safety controls
 
@@ -153,6 +153,46 @@ Check the public post:
 ```json
 { "id": 123 }
 ```
+
+### Content totals and list values
+
+Call `wordpress_content_stats` with an empty object to obtain a lightweight
+summary. It makes three `per_page=1` REST requests and reads WordPress
+`X-WP-Total` headers, so it does not download the full post or media library.
+
+```json
+{}
+```
+
+The response uses explicit metric names and WordPress status values:
+
+```json
+{
+  "posts": {
+    "total": 120,
+    "active": 100,
+    "inactive": 20,
+    "active_option": {
+      "name": "published",
+      "value": "publish"
+    },
+    "inactive_options": [
+      { "name": "draft", "value": "draft" },
+      { "name": "pending", "value": "pending" },
+      { "name": "scheduled", "value": "future" },
+      { "name": "private", "value": "private" }
+    ]
+  },
+  "media": { "total": 340 }
+}
+```
+
+`active` means `status=publish`. `inactive` is every visible non-published post
+(`total - active`), so it can also include custom statuses registered by a
+WordPress installation. WordPress trash is excluded from these counts. Use
+`wordpress_list_posts` to enumerate posts by status; use
+`wordpress_list_media` to enumerate media. Media results include
+`title.rendered`, `source_url`, `mime_type`, `alt_text`, and dimensions.
 
 ## Development
 

@@ -15,6 +15,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"mcp-wp-go/internal/config"
@@ -114,17 +115,24 @@ func (c *Client) doJSON(ctx context.Context, method, segment string, query url.V
 }
 
 func (c *Client) execute(client *http.Client, req *http.Request, output any) error {
+	_, err := c.executeWithHeaders(client, req, output)
+	return err
+}
+
+// executeWithHeaders preserves collection pagination headers for callers that
+// need a total without downloading every item.
+func (c *Client) executeWithHeaders(client *http.Client, req *http.Request, output any) (http.Header, error) {
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("WordPress request failed: %w", err)
+		return nil, fmt.Errorf("WordPress request failed: %w", err)
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
 	if err != nil {
-		return fmt.Errorf("read WordPress response: %w", err)
+		return nil, fmt.Errorf("read WordPress response: %w", err)
 	}
 	if len(body) > maxResponseBytes {
-		return errors.New("WordPress response exceeds size limit")
+		return nil, errors.New("WordPress response exceeds size limit")
 	}
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		var apiError struct {
@@ -133,17 +141,16 @@ func (c *Client) execute(client *http.Client, req *http.Request, output any) err
 		}
 		_ = json.Unmarshal(body, &apiError)
 		if apiError.Message != "" {
-			return fmt.Errorf("WordPress API returned HTTP %d (%s): %s", resp.StatusCode, apiError.Code, apiError.Message)
+			return nil, fmt.Errorf("WordPress API returned HTTP %d (%s): %s", resp.StatusCode, apiError.Code, apiError.Message)
 		}
-		return fmt.Errorf("WordPress API returned HTTP %d", resp.StatusCode)
+		return nil, fmt.Errorf("WordPress API returned HTTP %d", resp.StatusCode)
 	}
-	if output == nil || len(body) == 0 {
-		return nil
+	if output != nil && len(body) != 0 {
+		if err := json.Unmarshal(body, output); err != nil {
+			return nil, fmt.Errorf("decode WordPress response: %w", err)
+		}
 	}
-	if err := json.Unmarshal(body, output); err != nil {
-		return fmt.Errorf("decode WordPress response: %w", err)
-	}
-	return nil
+	return resp.Header.Clone(), nil
 }
 
 // ListPosts returns posts visible to the configured editor.
@@ -166,6 +173,66 @@ func (c *Client) ListPosts(ctx context.Context, status, search string, page, per
 		return nil, err
 	}
 	return posts, nil
+}
+
+// ContentTotals is the lightweight inventory summary exposed by the REST API.
+// Totals include resources visible to the configured account; WordPress trash is
+// excluded because it is not returned by status=any collection requests.
+type ContentTotals struct {
+	Posts          int
+	PublishedPosts int
+	Media          int
+}
+
+// ContentTotals returns post and media counts using WordPress X-WP-Total headers.
+// It requests one item per collection so a large site does not transfer all content
+// merely to render a dashboard summary.
+func (c *Client) ContentTotals(ctx context.Context) (ContentTotals, error) {
+	posts, err := c.countCollection(ctx, "posts", url.Values{"status": {"any"}})
+	if err != nil {
+		return ContentTotals{}, fmt.Errorf("count posts: %w", err)
+	}
+	published, err := c.countCollection(ctx, "posts", url.Values{"status": {"publish"}})
+	if err != nil {
+		return ContentTotals{}, fmt.Errorf("count published posts: %w", err)
+	}
+	media, err := c.countCollection(ctx, "media", nil)
+	if err != nil {
+		return ContentTotals{}, fmt.Errorf("count media: %w", err)
+	}
+	if published > posts {
+		return ContentTotals{}, errors.New("published post count exceeds total post count")
+	}
+	return ContentTotals{Posts: posts, PublishedPosts: published, Media: media}, nil
+}
+
+func (c *Client) countCollection(ctx context.Context, segment string, query url.Values) (int, error) {
+	if query == nil {
+		query = make(url.Values)
+	} else {
+		query = query.Clone()
+	}
+	query.Set("context", "edit")
+	query.Set("per_page", "1")
+	u, err := c.endpoint(segment, query)
+	if err != nil {
+		return 0, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return 0, fmt.Errorf("build WordPress count request: %w", err)
+	}
+	req.SetBasicAuth(c.username, c.appPassword)
+	req.Header.Set("Accept", "application/json")
+	headers, err := c.executeWithHeaders(c.httpClient, req, nil)
+	if err != nil {
+		return 0, err
+	}
+	total, err := strconv.Atoi(headers.Get("X-WP-Total"))
+	if err != nil || total < 0 {
+		return 0, errors.New("WordPress response has an invalid X-WP-Total header")
+	}
+	return total, nil
 }
 
 // GetPost gets raw editable content; it is not a public-only endpoint.

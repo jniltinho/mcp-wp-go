@@ -266,6 +266,32 @@ type healthOutput struct {
 	User    wordpress.User `json:"user"`
 }
 
+// countOption describes the WordPress value behind a summary metric.
+type countOption struct {
+	Name        string `json:"name"`
+	Value       string `json:"value"`
+	Description string `json:"description"`
+}
+
+type postCountOutput struct {
+	Total           int           `json:"total"`
+	Active          int           `json:"active"`
+	Inactive        int           `json:"inactive"`
+	ActiveOption    countOption   `json:"active_option"`
+	InactiveOptions []countOption `json:"inactive_options"`
+	Scope           string        `json:"scope"`
+}
+
+type mediaCountOutput struct {
+	Total int    `json:"total"`
+	Scope string `json:"scope"`
+}
+
+type contentStatsOutput struct {
+	Posts postCountOutput  `json:"posts"`
+	Media mediaCountOutput `json:"media"`
+}
+
 type liveOutput struct {
 	Post       wordpress.Post `json:"post"`
 	HTTPStatus int            `json:"http_status"`
@@ -273,6 +299,37 @@ type liveOutput struct {
 }
 
 func addSiteTools(server *mcp.Server, wp *wordpress.Client, baseURL string) {
+	mcp.AddTool(server, &mcp.Tool{Name: "wordpress_content_stats", Description: "Returns total posts, active published posts, inactive non-published posts, and total media. Counts use one-item REST requests and X-WP-Total headers."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, contentStatsOutput, error) {
+			totals, err := wp.ContentTotals(ctx)
+			if err != nil {
+				return nil, contentStatsOutput{}, err
+			}
+			inactive := totals.Posts - totals.PublishedPosts
+			return nil, contentStatsOutput{
+				Posts: postCountOutput{
+					Total:    totals.Posts,
+					Active:   totals.PublishedPosts,
+					Inactive: inactive,
+					ActiveOption: countOption{
+						Name:        "published",
+						Value:       "publish",
+						Description: "Posts publicly live at their permalink.",
+					},
+					InactiveOptions: []countOption{
+						{Name: "draft", Value: "draft", Description: "Unpublished editable post."},
+						{Name: "pending", Value: "pending", Description: "Awaiting editorial review."},
+						{Name: "scheduled", Value: "future", Description: "Scheduled for future publication."},
+						{Name: "private", Value: "private", Description: "Visible only to authorized WordPress users."},
+					},
+					Scope: "Posts visible to the configured account with status=any; WordPress trash is excluded. Inactive is total minus publish and can include registered custom statuses.",
+				},
+				Media: mediaCountOutput{
+					Total: totals.Media,
+					Scope: "Media visible to the configured account; WordPress trash is excluded.",
+				},
+			}, nil
+		})
 	mcp.AddTool(server, &mcp.Tool{Name: "wordpress_list_categories", Description: "Lists existing categories for reuse."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, input termsInput) (*mcp.CallToolResult, termsOutput, error) {
 			if err := validatePagination(input.Page, input.PerPage); err != nil {
