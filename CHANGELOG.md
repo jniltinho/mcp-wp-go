@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 —
 
+## [0.3.0] — 2026-09-11
+
+### Added
+- `wordpress_content_stats` for total posts, active published posts, inactive non-published posts, and total media.
+- Explicit names and WordPress status values for `publish`, `draft`, `pending`, `future`, and `private` in the statistics response.
+- Media titles in `wordpress_list_media` results, alongside the existing URL, MIME type, alt text, and dimensions.
+
+### Notes
+- Statistics are read from `X-WP-Total` pagination headers using one item per request; WordPress trash is excluded.
+
 ## [0.2.0] — 2026-09-11
 
 ### Added
