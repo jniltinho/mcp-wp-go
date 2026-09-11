@@ -144,3 +144,21 @@ func TestCheckPostLive(t *testing.T) {
 		t.Fatalf("CheckPostLive() = post=%d status=%d live=%t", post.ID, status, live)
 	}
 }
+
+func TestGetPostExposesFeaturedMedia(t *testing.T) {
+	client, site := testClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/wp-json/wp/v2/posts/11" || r.URL.Query().Get("context") != "edit" {
+			t.Fatalf("unexpected request %s", r.URL)
+		}
+		_, _ = w.Write([]byte(`{"id":11,"featured_media":99,"status":"publish"}`))
+	}))
+	defer site.Close()
+
+	post, err := client.GetPost(context.Background(), 11)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if post.FeaturedMedia != 99 {
+		t.Fatalf("FeaturedMedia = %d, want 99", post.FeaturedMedia)
+	}
+}

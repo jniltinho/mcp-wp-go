@@ -1,6 +1,6 @@
 BIN     := dist/mcp-wp-go
 SRC     := $(shell find . -type f -name '*.go' -not -path './vendor/*') go.mod go.sum
-VERSION ?= 0.1.2
+VERSION ?= 0.1.3
 PREFIX  ?= /usr/local
 LDFLAGS := -s -w -X mcp-wp-go/internal/server.Version=$(VERSION)
 

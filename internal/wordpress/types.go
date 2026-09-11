@@ -11,6 +11,7 @@ type RenderedField struct {
 // Post is the response shape used by the post tools.
 type Post struct {
 	ID            int           `json:"id"`
+	FeaturedMedia int           `json:"featured_media"`
 	Date          string        `json:"date"`
 	Modified      string        `json:"modified"`
 	Slug          string        `json:"slug"`
