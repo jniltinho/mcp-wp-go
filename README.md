@@ -1,8 +1,8 @@
 # mcp-wp-go
 
-A **Go MCP server** for administering one WordPress site through its REST API,
-without SSH. It uses only the official MCP Go SDK:
-[`github.com/modelcontextprotocol/go-sdk`](https://github.com/modelcontextprotocol/go-sdk).
+A **Go MCP server and content utility CLI** for administering one WordPress
+site through its REST API, without SSH. The MCP server uses the official MCP Go
+SDK, and the command tree uses Cobra.
 
 It authenticates with a **WordPress application password**, never with a server
 password. Communication runs over `stdio`: `stdout` is reserved for the MCP
@@ -63,6 +63,38 @@ The binary is created at `dist/mcp-wp-go`. The local `.env` file is ignored by
 Git. Its loader accepts only simple `KEY=VALUE` lines (optional single or double
 quotes); it never executes shell expressions. Values already present in the
 process environment take precedence over values in the file.
+
+## Convert Markdown to WordPress HTML
+
+The `post-html` subcommand converts a `.md` or `.markdown` file into an HTML
+fragment suitable for the WordPress `content` field. It supports headings,
+lists, links, blockquotes, tables, fenced code blocks with `language-*` classes,
+and embedded HTML. It does not add `<html>` or `<body>` wrappers.
+
+Write the HTML to stdout:
+
+```bash
+dist/mcp-wp-go post-html article.md
+```
+
+Write it to a file:
+
+```bash
+dist/mcp-wp-go post-html article.md --output article.html
+```
+
+`markdown` and `md` are aliases for `post-html`, and `-o` is the short form of
+`--output`. The command refuses to overwrite its Markdown input. Embedded HTML
+is preserved, so only convert trusted files before sending the result to
+WordPress.
+
+Images referenced by Markdown are written as `<img>` elements, but the command
+does not upload their files. Upload images with `wordpress_upload_media` and use
+the returned site-relative `/wp-content/uploads/...` URL. For a cover, create
+the draft and call `wordpress_set_post_cover`; it uploads the image and places
+it first without setting a duplicated featured image. Responsive YouTube
+iframes can be included as trusted HTML, and fenced script blocks retain their
+language class, escaping code characters such as `<` and `>`.
 
 ## Configuration
 

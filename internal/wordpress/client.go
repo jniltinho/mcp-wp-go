@@ -126,7 +126,7 @@ func (c *Client) executeWithHeaders(client *http.Client, req *http.Request, outp
 	if err != nil {
 		return nil, fmt.Errorf("WordPress request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // response body close errors cannot affect the buffered response
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
 	if err != nil {
 		return nil, fmt.Errorf("read WordPress response: %w", err)
@@ -394,16 +394,16 @@ func (c *Client) uploadFile(pathname string) (string, string, *os.File, error) {
 	var header [512]byte
 	n, readErr := file.Read(header[:])
 	if readErr != nil && readErr != io.EOF {
-		file.Close()
+		_ = file.Close() // the read error is the actionable failure
 		return "", "", nil, fmt.Errorf("read upload file: %w", readErr)
 	}
 	detected := http.DetectContentType(header[:n])
 	if detected != expected {
-		file.Close()
+		_ = file.Close() // the content-type mismatch is the actionable failure
 		return "", "", nil, fmt.Errorf("file type %q does not match %s extension", detected, ext)
 	}
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		file.Close()
+		_ = file.Close() // the seek error is the actionable failure
 		return "", "", nil, fmt.Errorf("rewind upload file: %w", err)
 	}
 	return filepath.Base(resolved), expected, file, nil
@@ -415,7 +415,7 @@ func (c *Client) UploadMedia(ctx context.Context, pathname string, postID int, a
 	if err != nil {
 		return Media{}, err
 	}
-	defer file.Close()
+	defer file.Close() //nolint:errcheck // the read-only upload has no buffered writes to preserve
 
 	u, err := c.endpoint("media", nil)
 	if err != nil {
@@ -574,7 +574,7 @@ func (c *Client) CheckPostLive(ctx context.Context, id int) (Post, int, bool, er
 	if err != nil {
 		return post, 0, false, fmt.Errorf("public permalink check failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // read-only status check; close errors do not change HTTP status
 	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
 	live := post.Status == "publish" && resp.StatusCode >= 200 && resp.StatusCode < 300
 	return post, resp.StatusCode, live, nil

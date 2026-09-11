@@ -102,7 +102,9 @@ func parseBaseURL(raw string) (*url.URL, error) {
 	if u.User != nil || u.RawQuery != "" || u.Fragment != "" {
 		return nil, errors.New("WP_BASE_URL must not contain credentials, a query, or a fragment")
 	}
-	if u.Scheme != "https" && !(u.Scheme == "http" && isLoopbackHost(u.Hostname())) {
+	isHTTPS := u.Scheme == "https"
+	isLoopbackHTTP := u.Scheme == "http" && isLoopbackHost(u.Hostname())
+	if !isHTTPS && !isLoopbackHTTP {
 		return nil, errors.New("WP_BASE_URL must use HTTPS (HTTP is allowed only for localhost)")
 	}
 	u.Path = strings.TrimRight(u.Path, "/")
@@ -125,7 +127,7 @@ func LoadEnvFile(name string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer file.Close() //nolint:errcheck // the read-only file has no buffered writes to preserve
 
 	scanner := bufio.NewScanner(file)
 	for lineNo := 1; scanner.Scan(); lineNo++ {

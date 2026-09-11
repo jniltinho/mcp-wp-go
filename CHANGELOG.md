@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 —
 
+## [0.4.0] — 2026-09-11
+
+**Markdown authoring is now a first-class CLI workflow for WordPress posts.**
+
+### Added
+- Cobra command structure while preserving the no-subcommand stdio MCP server behavior.
+- `post-html` command (aliases: `markdown`, `md`) to convert trusted Markdown files into WordPress-ready HTML fragments using `gomarkdown/markdown`.
+- `--output`/`-o` support for writing converted HTML to a file; stdout remains the default.
+- Golden fixtures and a complete `examples/` pair covering a leading cover, media-library images, a responsive YouTube embed, and Bash, YAML, and JavaScript code blocks.
+
+### Changed
+- Document the media workflow: upload body images separately and use `wordpress_set_post_cover` to insert the cover without setting a duplicate featured image.
+- Resolve existing static-analysis findings around URL validation and read-only resource cleanup.
+
 ## [0.3.0] — 2026-09-11
 
 ### Added
