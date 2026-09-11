@@ -399,7 +399,7 @@ func (c *Client) DeleteMedia(ctx context.Context, id int, permanent bool) error 
 }
 
 // SetPostCover uploads an image and puts it first in the post body. It never sets
-// WordPress's featured-image field because the LinuxPro theme would render it twice.
+// WordPress's featured-image field because some themes render it twice.
 func (c *Client) SetPostCover(ctx context.Context, postID int, pathname, altText string, replaceExisting bool) (Post, Media, error) {
 	post, err := c.GetPost(ctx, postID)
 	if err != nil {

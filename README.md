@@ -1,7 +1,7 @@
 # mcp-wp-go
 
 A **Go MCP server** for administering one WordPress site through its REST API,
-without SSH. It was built for LinuxPro and uses only the official MCP Go SDK:
+without SSH. It uses only the official MCP Go SDK:
 [`github.com/modelcontextprotocol/go-sdk`](https://github.com/modelcontextprotocol/go-sdk).
 
 It authenticates with a **WordPress application password**, never with a server
@@ -31,7 +31,7 @@ protocol and diagnostic messages go to `stderr`.
   status, and keeps comments closed.
 - `wordpress_set_post_cover` uploads the image, uses the relative URL returned
   by the site, and places it as the first body element. It **does not** set a
-  featured image, avoiding duplicated covers in the LinuxPro theme.
+  featured image, avoiding duplicated covers in themes that render featured images separately.
 - `wordpress_check_post_live` reads the authenticated post and requests its
   public permalink. It reports `live: true` only when the post is `publish` and
   the page returns HTTP 2xx.
@@ -66,7 +66,7 @@ process environment take precedence over values in the file.
 
 | Variable | Required | Description |
 |---|---:|---|
-| `WP_BASE_URL` | yes | Canonical URL, for example `https://www.linuxpro.com.br` |
+| `WP_BASE_URL` | yes | Canonical URL, for example `https://wp-domain.com` |
 | `WP_USERNAME` | yes | WordPress account associated with the application password |
 | `WP_APP_PASSWORD` | yes | WordPress application password |
 | `WP_TIMEOUT` | no | HTTP timeout; default `30s` |
@@ -118,9 +118,9 @@ Upload an accessible image:
 
 ```json
 {
-  "file_path": "/authorized/path/openobserve-cover.webp",
-  "alt_text": "LinuxPro mascot in front of observability dashboards",
-  "post_id": 1533
+  "file_path": "/authorized/path/cover.webp",
+  "alt_text": "Observability dashboards for a production service",
+  "post_id": 123
 }
 ```
 
@@ -128,8 +128,8 @@ Replace the first body cover image (replacement is the default):
 
 ```json
 {
-  "post_id": 1533,
-  "file_path": "/authorized/path/openobserve-cover.webp",
+  "post_id": 123,
+  "file_path": "/authorized/path/cover.webp",
   "alt_text": "Cover for the OpenObserve on Ubuntu guide"
 }
 ```

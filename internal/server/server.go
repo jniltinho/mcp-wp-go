@@ -12,14 +12,14 @@ import (
 	"mcp-wp-go/internal/wordpress"
 )
 
-var Version = "0.1.0"
+var Version = "0.1.1"
 
 // New creates an MCP server with WordPress post, media and verification tools.
 func New(cfg config.Config) *mcp.Server {
 	wp := wordpress.New(cfg)
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:        "mcp-wp-go",
-		Title:       "LinuxPro WordPress MCP",
+		Title:       "WordPress REST MCP",
 		Description: "Manages WordPress posts and images through the REST API without SSH.",
 		Version:     Version,
 	}, nil)
