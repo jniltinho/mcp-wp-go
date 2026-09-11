@@ -1,126 +1,88 @@
 # mcp-wp-go
 
-A **Go MCP server and content utility CLI** for administering one WordPress
-site through its REST API, without SSH. The MCP server uses the official MCP Go
-SDK, and the command tree uses Cobra.
+[![CI](https://github.com/jniltinho/mcp-wp-go/actions/workflows/ci.yml/badge.svg)](https://github.com/jniltinho/mcp-wp-go/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/jniltinho/mcp-wp-go?color=blue)](https://github.com/jniltinho/mcp-wp-go/releases)
+[![Go](https://img.shields.io/github/go-mod/go-version/jniltinho/mcp-wp-go)](go.mod)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-It authenticates with a **WordPress application password**, never with a server
-password. Communication runs over `stdio`: `stdout` is reserved for the MCP
-protocol and diagnostic messages go to `stderr`.
+Manage **WordPress posts and media through MCP**, without SSH, and turn Markdown
+articles into publication-ready HTML — one small, static Go binary.
 
-## Features
+```text
+AI assistant ──stdio/MCP──▶ mcp-wp-go ──HTTPS/REST──▶ WordPress
+Markdown file ──post-html─▶ post HTML fragment ─────▶ post content
+Local images ──media tools──────────────────────────▶ Media Library
+```
 
-| Area | Tools |
-|---|---|
-| Posts | `wordpress_list_posts`, `wordpress_get_post`, `wordpress_create_post`, `wordpress_update_post`, `wordpress_publish_posts`, `wordpress_unpublish_posts`, `wordpress_delete_post` |
-| Media | `wordpress_list_media`, `wordpress_get_media`, `wordpress_upload_media`, `wordpress_update_media`, `wordpress_delete_media` |
-| Covers | `wordpress_set_post_cover` |
-| Taxonomy and validation | `wordpress_list_categories`, `wordpress_list_tags`, `wordpress_content_stats`, `wordpress_site_health`, `wordpress_check_post_live` |
+| Capability | What it does |
+| --- | --- |
+| Posts | List, read, create drafts, edit, publish, unpublish, and delete |
+| Media | Upload, inspect, update, associate, and delete images |
+| Covers | Upload a cover and place it first without duplicating a featured image |
+| Markdown | Convert `.md`/`.markdown` into WordPress-ready HTML |
+| Taxonomy | Reuse existing categories and tags |
+| Validation | Check credentials, content totals, and whether a post is publicly live |
 
-### Safety controls
+## Install
 
-- The WordPress URL comes only from configuration; no tool accepts an arbitrary
-  URL. HTTPS is mandatory except for `localhost` development.
-- Deletions require `confirm: true` and move resources to trash by default.
-  Permanent deletion also requires `permanent: true`.
-- Uploads allow only GIF, JPEG, PNG, and WebP. The server checks the extension,
-  detected file signature, and size. Set `WP_UPLOAD_ROOT` to restrict which
-  local paths the MCP process can read.
-- `wordpress_create_post` always closes comments.
-- `wordpress_update_post` cannot change an existing post's slug, date, or
-  status, and keeps comments closed. Dedicated publish and unpublish tools
-  require `confirm: true`, accept one to 100 unique IDs, and report every
-  result because bulk status changes are not transactional.
-- `wordpress_set_post_cover` uploads the image, uses the relative URL returned
-  by the site, and places it as the first body element. It **does not** set a
-  featured image, avoiding duplicated covers in themes that render featured images separately.
-- `wordpress_check_post_live` reads the authenticated post and requests its
-  public permalink. It reports `live: true` only when the post is `publish` and
-  the page returns HTTP 2xx.
+Download the package for your platform from the
+[latest release](https://github.com/jniltinho/mcp-wp-go/releases/latest):
 
-## Requirements
+- Linux: `mcp-wp-go_<version>_linux_amd64.tar.gz`
+- macOS: `mcp-wp-go_<version>_darwin_arm64.tar.gz`
+- Windows: `mcp-wp-go_<version>_windows_amd64.zip`
 
-- Go 1.27 or newer to build.
-- A WordPress account with the necessary capabilities (Editor is appropriate for
-  content; upload and delete capabilities depend on the account).
-- A [WordPress application password](https://wordpress.org/documentation/article/application-passwords/).
-
-> Do not use `root`, your normal account password, or database credentials.
-> Revoke an application password immediately if it is exposed.
-
-## Build
+Linux example:
 
 ```bash
+tar -xzf mcp-wp-go_*_linux_amd64.tar.gz
+sudo install -m 0755 mcp-wp-go /usr/local/bin/mcp-wp-go
+mcp-wp-go --help
+```
+
+Or build from source with Go 1.27 or newer:
+
+```bash
+git clone https://github.com/jniltinho/mcp-wp-go.git
 cd mcp-wp-go
-cp .env.example .env
-chmod 600 .env
-# Edit .env with the site URL, WordPress user, and application password.
-make check
-make build
+make check && make build
+sudo make install
 ```
 
-The binary is created at `dist/mcp-wp-go`. The local `.env` file is ignored by
-Git. Its loader accepts only simple `KEY=VALUE` lines (optional single or double
-quotes); it never executes shell expressions. Values already present in the
-process environment take precedence over values in the file.
+## Quick start
 
-## Convert Markdown to WordPress HTML
+### 1. Configure WordPress
 
-The `post-html` subcommand converts a `.md` or `.markdown` file into an HTML
-fragment suitable for the WordPress `content` field. It supports headings,
-lists, links, blockquotes, tables, fenced code blocks with `language-*` classes,
-and embedded HTML. It does not add `<html>` or `<body>` wrappers.
-
-Write the HTML to stdout:
+Create a dedicated
+[WordPress application password](https://developer.wordpress.org/rest-api/using-the-rest-api/authentication/#basic-authentication-with-application-passwords),
+then store it in a private file:
 
 ```bash
-dist/mcp-wp-go post-html article.md
+mkdir -p ~/.config
+install -m 600 .env.example ~/.config/mcp-wp-go.env
+${EDITOR:-vi} ~/.config/mcp-wp-go.env
 ```
 
-Write it to a file:
-
-```bash
-dist/mcp-wp-go post-html article.md --output article.html
+```dotenv
+WP_BASE_URL=https://wordpress.example.com
+WP_USERNAME=editor-user
+WP_APP_PASSWORD=xxxx xxxx xxxx xxxx xxxx xxxx
+WP_UPLOAD_ROOT=/home/user/wordpress-media
 ```
 
-`markdown` and `md` are aliases for `post-html`, and `-o` is the short form of
-`--output`. The command refuses to overwrite its Markdown input. Embedded HTML
-is preserved, so only convert trusted files before sending the result to
-WordPress.
+Use an Editor or another account with only the capabilities the workflow needs.
+Never use a server password or commit the application password to Git.
 
-Images referenced by Markdown are written as `<img>` elements, but the command
-does not upload their files. Upload images with `wordpress_upload_media` and use
-the returned site-relative `/wp-content/uploads/...` URL. For a cover, create
-the draft and call `wordpress_set_post_cover`; it uploads the image and places
-it first without setting a duplicated featured image. Responsive YouTube
-iframes can be included as trusted HTML, and fenced script blocks retain their
-language class, escaping code characters such as `<` and `>`.
+### 2. Register the MCP server
 
-## Configuration
-
-| Variable | Required | Description |
-|---|---:|---|
-| `WP_BASE_URL` | yes | Canonical URL, for example `https://wp-domain.com` |
-| `WP_USERNAME` | yes | WordPress account associated with the application password |
-| `WP_APP_PASSWORD` | yes | WordPress application password |
-| `WP_TIMEOUT` | no | HTTP timeout; default `30s` |
-| `WP_MAX_UPLOAD_BYTES` | no | Maximum upload size; default `26214400` (25 MiB) |
-| `WP_UPLOAD_ROOT` | no, recommended | Root directory from which images may be uploaded |
-
-After registering the server, call `wordpress_site_health` to validate the
-credentials. It returns the authenticated user, never the application password.
-
-## Register with an MCP client
-
-Use absolute paths for both the binary and the private configuration file. This
-is an example of a local MCP configuration entry:
+Add the binary to the MCP client's stdio configuration using absolute paths:
 
 ```json
 {
   "mcpServers": {
-    "wordpress_go": {
+    "wordpress": {
       "type": "stdio",
-      "command": "/absolute/path/to/mcp-wp-go/dist/mcp-wp-go",
+      "command": "/usr/local/bin/mcp-wp-go",
       "args": [
         "--env-file",
         "/home/user/.config/mcp-wp-go.env"
@@ -130,121 +92,108 @@ is an example of a local MCP configuration entry:
 }
 ```
 
-Create `~/.config/mcp-wp-go.env` with mode `600`, using the values from
-`.env.example`. Never put an application password in `.mcp.json`, a README,
-Git, or logs. Reload the MCP client after changing its configuration.
+Reload the MCP client and call `wordpress_site_health`. A successful response
+shows the configured site and authenticated WordPress user without exposing the
+application password.
 
-## MCP call examples
+### 3. Create safely, then publish deliberately
 
-Create a draft:
+Ask the MCP client to:
 
-```json
-{
-  "title": "New post",
-  "content": "<p>Introduction.</p>",
-  "status": "draft",
-  "categories": [115],
-  "tags": [42]
-}
+1. list categories and tags;
+2. create the post as a draft;
+3. upload body images;
+4. set the post cover;
+5. read the draft back for validation;
+6. publish with explicit confirmation;
+7. run `wordpress_check_post_live`.
+
+Publishing, unpublishing, and deletion require `confirm: true`. Draft-first is
+the recommended workflow.
+
+## Markdown to WordPress HTML
+
+Convert an article to stdout:
+
+```bash
+mcp-wp-go post-html article.md
 ```
 
-Upload an accessible image:
+Or write it directly to a file:
 
-```json
-{
-  "file_path": "/authorized/path/cover.webp",
-  "alt_text": "Observability dashboards for a production service",
-  "post_id": 123
-}
+```bash
+mcp-wp-go post-html article.md --output article.html
+# aliases: markdown, md    short flag: -o
 ```
 
-Replace the first body cover image (replacement is the default):
+The output is an HTML fragment rather than a complete document, so it can be
+sent directly as WordPress post content. Tables, fenced code languages, inline
+images, links, blockquotes, and trusted embedded HTML are preserved.
 
-```json
-{
-  "post_id": 123,
-  "file_path": "/authorized/path/cover.webp",
-  "alt_text": "Cover for the OpenObserve on Ubuntu guide"
-}
+````markdown
+## Install
+
+![Application screen](/wp-content/uploads/2026/09/application.webp)
+
+```bash
+curl -fsSL https://example.com/install.sh | sh
 ```
 
-Publish one or more posts (explicit confirmation is required):
+<div class="video-container"><iframe src="https://www.youtube.com/embed/VIDEO_ID" title="Demo" loading="lazy" allowfullscreen></iframe></div>
+````
 
-```json
-{ "ids": [123, 124], "confirm": true }
+The converter does **not** upload images. Upload them through
+`wordpress_upload_media`, use the returned site-relative path, and use
+`wordpress_set_post_cover` for the cover. Embedded HTML is not sanitized; only
+convert trusted Markdown files.
+
+See the executable pair in [`examples/`](examples/) and the complete
+[content workflow](docs/CONTENT-WORKFLOW.md).
+
+## Safety by default
+
+- WordPress requests are restricted to the configured site and use HTTPS;
+  plain HTTP is accepted only for loopback development.
+- `stdout` is reserved for MCP JSON-RPC; diagnostics go to `stderr`.
+- New and updated posts always have comments closed.
+- Existing post slugs and dates cannot be changed by the update tool.
+- Status changes and deletions require explicit confirmation.
+- Uploads are size-limited and checked by extension and detected file type.
+- Covers use relative Media Library URLs and never set `featured_media`.
+- REST API calls preserve WordPress permissions, hooks, and cache behavior.
+
+## Documentation
+
+| Guide | Contents |
+| --- | --- |
+| [Getting started](docs/GETTING-STARTED.md) | Installation, credentials, MCP registration, first health check |
+| [Usage](docs/USAGE.md) | Post, media, taxonomy, publication, and validation examples |
+| [Content workflow](docs/CONTENT-WORKFLOW.md) | Markdown, images, covers, YouTube, and script blocks |
+| [Tool reference](docs/TOOLS.md) | Every MCP tool, input, and safety behavior |
+| [Architecture](docs/ARCHITECTURE.md) | Package boundaries, data flows, and design decisions |
+| [Development](docs/DEVELOPMENT.md) | Tests, linting, cross-builds, CI, and releases |
+
+## Architecture
+
+One binary, two entry paths, and clear package boundaries:
+
+```text
+main.go → cmd/ ┬→ MCP server → internal/server → internal/wordpress → WP REST API
+               └→ post-html  → internal/posthtml → gomarkdown
 ```
 
-Unpublish one or more posts by moving them to drafts:
-
-```json
-{ "ids": [123, 124], "confirm": true }
-```
-
-Check the public post:
-
-```json
-{ "id": 123 }
-```
-
-### Content totals and list values
-
-Call `wordpress_content_stats` with an empty object to obtain a lightweight
-summary. It makes three `per_page=1` REST requests and reads WordPress
-`X-WP-Total` headers, so it does not download the full post or media library.
-
-```json
-{}
-```
-
-The response uses explicit metric names and WordPress status values:
-
-```json
-{
-  "posts": {
-    "total": 120,
-    "active": 100,
-    "inactive": 20,
-    "active_option": {
-      "name": "published",
-      "value": "publish"
-    },
-    "inactive_options": [
-      { "name": "draft", "value": "draft" },
-      { "name": "pending", "value": "pending" },
-      { "name": "scheduled", "value": "future" },
-      { "name": "private", "value": "private" }
-    ]
-  },
-  "media": { "total": 340 }
-}
-```
-
-`active` means `status=publish`. `inactive` is every visible non-published post
-(`total - active`), so it can also include custom statuses registered by a
-WordPress installation. WordPress trash is excluded from these counts. Use
-`wordpress_list_posts` to enumerate posts by status; use
-`wordpress_list_media` to enumerate media. Media results include
-`title.rendered`, `source_url`, `mime_type`, `alt_text`, and dimensions.
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full design.
 
 ## Development
 
 ```bash
-make fmt            # format Go source
-make vet            # run standard static analysis
-make test           # run tests with the race detector
-make lint           # fail if formatting or vet checks fail
-make check          # format, vet, test, and verify modules
-make release-cross  # build Linux amd64, macOS arm64, and Windows amd64 archives
-make clean          # remove local artifacts
+make build          # static binary → dist/mcp-wp-go
+make test           # tests with the race detector
+make lint           # gofmt verification + go vet
+make check          # format, lint, test, and module verification
+make release-cross  # Linux amd64, macOS arm64, Windows amd64
 ```
 
-The project does not execute remote shells and does not use SSH. Publishing is
-performed through the WordPress REST API so the installation's own permissions,
-hooks, and cache integration remain in effect.
+## License
 
-## Releases
-
-Pushing a `v*` tag runs `.github/workflows/release.yml`. The workflow tests the
-module, builds static archives for Linux amd64, macOS arm64, and Windows amd64,
-and publishes them as a GitHub Release. The release version is derived from the
-Git tag; release notes are curated after the workflow completes.
+[MIT](LICENSE) © Nilton Oliveira

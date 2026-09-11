@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-—
+### Documentation
+- Add a structured documentation hub with getting-started, usage, content workflow, MCP tool reference, architecture, and development guides.
+- Redesign the repository README with release badges, a quick-start path, capability overview, safety summary, and links to deeper documentation.
 
 ## [0.4.0] — 2026-09-11
 
