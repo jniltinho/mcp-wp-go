@@ -1,6 +1,6 @@
 BIN     := dist/mcp-wp-go
 SRC     := $(shell find . -type f -name '*.go' -not -path './vendor/*') go.mod go.sum
-VERSION ?= 0.1.1
+VERSION ?= 0.1.2
 PREFIX  ?= /usr/local
 LDFLAGS := -s -w -X mcp-wp-go/internal/server.Version=$(VERSION)
 
@@ -12,7 +12,7 @@ build: $(BIN)
 
 $(BIN): $(SRC)
 	@mkdir -p dist
-	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o $@ ./cmd/mcp-wp-go
+	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o $@ .
 	@echo "  built:      $$(du -h $@ | cut -f1)"
 	@if command -v upx >/dev/null; then \
 	  if upx -q --best --lzma $@ >/dev/null 2>&1; then \
@@ -45,7 +45,7 @@ check: fmt lint test
 release-cross:
 	@mkdir -p dist/pkg
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "$(LDFLAGS)" \
-	  -o dist/pkg/mcp-wp-go ./cmd/mcp-wp-go
+	  -o dist/pkg/mcp-wp-go .
 	tar -czf dist/mcp-wp-go_$(VERSION)_linux_amd64.tar.gz \
 	  -C dist/pkg mcp-wp-go -C $(CURDIR) LICENSE README.md
 	@echo "  dist/mcp-wp-go_$(VERSION)_linux_amd64.tar.gz"
