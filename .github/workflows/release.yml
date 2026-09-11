@@ -23,7 +23,7 @@ jobs:
       - name: Run tests
         run: make test
 
-      - name: Build Linux amd64 package
+      - name: Build release packages
         run: make release-cross VERSION=${GITHUB_REF#refs/tags/v}
 
       - name: Create release
@@ -32,5 +32,7 @@ jobs:
           generate_release_notes: true
           files: |
             dist/mcp-wp-go_*_linux_amd64.tar.gz
+            dist/mcp-wp-go_*_darwin_arm64.tar.gz
+            dist/mcp-wp-go_*_windows_amd64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -148,7 +148,7 @@ make vet            # run standard static analysis
 make test           # run tests with the race detector
 make lint           # fail if formatting or vet checks fail
 make check          # format, vet, test, and verify modules
-make release-cross  # build Linux amd64 release archive
+make release-cross  # build Linux amd64, macOS arm64, and Windows amd64 archives
 make clean          # remove local artifacts
 ```
 
@@ -159,4 +159,6 @@ hooks, and cache integration remain in effect.
 ## Releases
 
 Pushing a `v*` tag runs `.github/workflows/release.yml`. The workflow tests the
-module, builds a static Linux amd64 archive, and publishes it as a GitHub Release.
+module, builds static archives for Linux amd64, macOS arm64, and Windows amd64,
+and publishes them as a GitHub Release. The release version is derived from the
+Git tag; release notes are curated after the workflow completes.
